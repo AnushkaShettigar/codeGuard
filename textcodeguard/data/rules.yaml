@@ -1,0 +1,365 @@
+rules:
+  - id: secret-python-env
+    category: secret_access
+    language: python
+    pattern: >-
+      (?i)(os\.environ\[["'](?:AWS|GCP|AZURE|SECRET|TOKEN|KEY|PASSWORD)[A-Z0-9_]*["']\]|os\.getenv\(["'](?:AWS|GCP|AZURE|SECRET|TOKEN|KEY|PASSWORD)[A-Z0-9_]*["']\)|os\.environ\.get\(["'](?:AWS|GCP|AZURE|SECRET|TOKEN|KEY|PASSWORD)[A-Z0-9_]*["']\))
+    weight: 0.96
+    reason: "Secret-bearing environment variable is accessed in Python."
+  - id: secret-python-file
+    category: secret_access
+    language: python
+    pattern: >-
+      (?i)(open\(["'](?:.*\\.env|.*\\.aws.*|.*credentials|.*id_rsa|.*\\.npmrc)["']|Path\(["'](?:.*\\.env|.*\\.aws.*|.*credentials|.*id_rsa|.*\\.npmrc)["']\))
+    weight: 0.93
+    reason: "Sensitive file path is opened for secret retrieval."
+  - id: secret-bash-aws
+    category: secret_access
+    language: bash
+    pattern: >-
+      (?i)(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|aws_secret_access_key|AWS_SECRET_ACCESS_KEY|aws_access_key_id)
+    weight: 0.99
+    reason: "Cloud credential-like secret is present in command text."
+  - id: secret-js-env
+    category: secret_access
+    language: javascript
+    pattern: >-
+      (?i)(process\.env\.(?:AWS_|GCP_|AZURE_|SECRET|TOKEN|KEY)|process\.env\[["'](?:AWS_|GCP_|AZURE_|SECRET|TOKEN|KEY))
+    weight: 0.95
+    reason: "JavaScript reads secret-bearing environment variables."
+  - id: secret-markdown
+    category: secret_access
+    language: markdown
+    pattern: >-
+      (?i)(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|xox[baprs]-[A-Za-z0-9-]+)
+    weight: 0.96
+    reason: "Credential-like secret appears in markdown text."
+  - id: secret-sql-user
+    category: secret_access
+    language: sql
+    pattern: >-
+      (?i)(from\s+(?:pg_shadow|mysql\.user|information_schema\.users)|select\s+.*\s+from\s+(?:pg_shadow|mysql\.user))
+    weight: 0.94
+    reason: "Query targets a credential store or user table."
+
+  - id: exfil-python-requests
+    category: data_exfiltration
+    language: python
+    pattern: >-
+      (?i)(requests\.(?:post|get|put|delete)\([^\n]*?(?:data=|json=|files=).*?(?:open\(|Path\(|read\())
+    weight: 0.9
+    reason: "Local file contents are sent to a remote endpoint."
+  - id: exfil-bash-curl
+    category: data_exfiltration
+    language: bash
+    pattern: >-
+      (?i)(curl\s+.*(?:\|\s*(?:bash|sh)|-F\s+file=@|--data\s+@)|nc\s+.*<\s*/etc/passwd|scp\s+.*@)
+    weight: 0.89
+    reason: "Command-line exfiltration via curl, nc, or scp."
+  - id: exfil-js-fetch
+    category: data_exfiltration
+    language: javascript
+    pattern: >-
+      (?i)(fetch\s*\(.*(?:fs\.readFileSync|readFile\(|navigator\.sendBeacon|FormData\())
+    weight: 0.88
+    reason: "JavaScript uploads local file content to a remote endpoint."
+  - id: exfil-sql-outfile
+    category: data_exfiltration
+    language: sql
+    pattern: >-
+      (?i)(into\s+outfile|into\s+dumpfile|load_file\s*\()
+    weight: 0.92
+    reason: "SQL export path indicates data exfiltration."
+  - id: exfil-markdown
+    category: data_exfiltration
+    language: markdown
+    pattern: >-
+      (?i)(curl\s+.*\|\s*(?:bash|sh)|scp\s+.*@|nc\s+.*\d+\.\d+\.\d+\.\d+)
+    weight: 0.82
+    reason: "Outbound exfiltration commands are embedded in markdown."
+
+  - id: destructive-python-rm
+    category: destructive_command
+    language: python
+    pattern: >-
+      (?i)(shutil\.rmtree\s*\(|os\.remove\s*\(|Path\(.*\)\.unlink\s*\(|subprocess\.(?:run|Popen|call)\([^\n]*["']rm\s+-rf)
+    weight: 0.93
+    reason: "Python code deletes files or directories destructively."
+  - id: destructive-bash-rm
+    category: destructive_command
+    language: bash
+    pattern: >-
+      (?i)(rm\s+-rf\s+(?:/|/tmp|/var|/dev/sd)|dd\s+if=/dev/zero\s+of=/dev/sd|mkfs\s+)
+    weight: 0.98
+    reason: "Bash command removes or wipes critical filesystem targets."
+  - id: destructive-js-rm
+    category: destructive_command
+    language: javascript
+    pattern: >-
+      (?i)(rm\s+-rf|mkfs|dd\s+if=/dev/zero|chmod\s+-R\s+777\s+/)
+    weight: 0.93
+    reason: "Dangerous shell wiping commands appear in JavaScript."
+  - id: destructive-yaml
+    category: destructive_command
+    language: yaml
+    pattern: >-
+      (?i)(rm\s+-rf\s+/|dd\s+if=/dev/zero\s+of=/dev/sd|mkfs\s+)
+    weight: 0.94
+    reason: "YAML step contains destructive disk-wiping commands."
+
+  - id: priv-python-rc
+    category: persistence_or_privesc
+    language: python
+    pattern: >-
+      (?i)(os\.setuid\(|os\.setgid\(|subprocess\.(?:run|Popen|call)\([^\n]*sudo|Path\(.*(?:\.bashrc|\.profile|authorized_keys)\).*write_text|open\([^\n]*(?:authorized_keys|\.bashrc))
+    weight: 0.92
+    reason: "Python adds persistence or escalates privileges."
+  - id: priv-bash-persistence
+    category: persistence_or_privesc
+    language: bash
+    pattern: >-
+      (?i)(crontab\s+-e|echo\s+.*>>\s*~/.bashrc|chmod\s+u\+s|sudo\s+|su\s+-)
+    weight: 0.94
+    reason: "Bash script alters persistence or privileges."
+  - id: priv-js-sudo
+    category: persistence_or_privesc
+    language: javascript
+    pattern: >-
+      (?i)(sudo\s+|chmod\s+u\+s|authorized_keys|\.ssh/authorized_keys)
+    weight: 0.87
+    reason: "JavaScript command attempts privilege escalation or SSH persistence."
+  - id: priv-yaml
+    category: persistence_or_privesc
+    language: yaml
+    pattern: >-
+      (?i)(authorized_keys|\.bashrc|cron|systemctl|sudo\s+|chmod\s+u\+s)
+    weight: 0.88
+    reason: "YAML workflow configures persistence or privilege escalation."
+  - id: priv-sql-grant
+    category: persistence_or_privesc
+    language: sql
+    pattern: >-
+      (?i)(grant\s+all\s+privileges|create\s+user\s+.*superuser|alter\s+role\s+.*superuser)
+    weight: 0.92
+    reason: "SQL grants dangerous privileges or creates a superuser."
+
+  - id: obf-python-eval
+    category: obfuscated_execution
+    language: python
+    pattern: >-
+      (?i)(eval\(|exec\(|__import__\(|base64\.b64decode\(|compile\()
+    weight: 0.96
+    reason: "Python uses dynamic code execution or decode-and-run patterns."
+  - id: obf-bash-eval
+    category: obfuscated_execution
+    language: bash
+    pattern: >-
+      (?i)(eval\s+\$\(|base64\s+-d\s+\|\s*(?:bash|sh)|\$\(printf\s+.*\)\s*\|\s*(?:bash|sh))
+    weight: 0.96
+    reason: "Bash shell decodes and executes payloads dynamically."
+  - id: obf-js-eval
+    category: obfuscated_execution
+    language: javascript
+    pattern: >-
+      (?i)(eval\(|new\s+Function\(|atob\(|setTimeout\(\s*["'].*["']\s*,\s*0\))
+    weight: 0.9
+    reason: "JavaScript evaluates decoded or generated script text."
+  - id: obf-yaml
+    category: obfuscated_execution
+    language: yaml
+    pattern: >-
+      (?i)(!!python/object|!!python/name|eval\(|base64\s+-d|python/object/apply)
+    weight: 0.9
+    reason: "YAML uses Python object tags or decode-and-run semantics."
+  - id: obf-sql-exec
+    category: obfuscated_execution
+    language: sql
+    pattern: >-
+      (?i)(exec\s*\(|sp_executesql|execute\s*\(\s*@sql|string\s*\+\s*@sql)
+    weight: 0.91
+    reason: "SQL executes dynamic or concatenated command strings."
+
+  - id: dep-python-typo
+    category: dependency_risk
+    language: python
+    pattern: >-
+      (?i)(pip\s+install\s+reqeusts|pip\s+install\s+.*(?:tp|lodah|rquest|git\+https?://.*curl\s*\|\s*sh))
+    weight: 0.88
+    reason: "Python package install points to a suspicious or typosquatted dependency."
+  - id: dep-bash-typo
+    category: dependency_risk
+    language: bash
+    pattern: >-
+      (?i)(pip\s+install\s+reqeusts|npm\s+i\s+lodahs|apt\s+install\s+.*https?://.*\|\s*(?:bash|sh))
+    weight: 0.87
+    reason: "Shell installation uses a suspicious package or remote bootstrap."
+  - id: dep-js-typo
+    category: dependency_risk
+    language: javascript
+    pattern: >-
+      (?i)(npm\s+i\s+(?:lodahs|lodashs|requests)|yarn\s+add\s+(?:lodahs|lodashs))
+    weight: 0.86
+    reason: "JavaScript install command uses lookalike or malicious dependency names."
+  - id: dep-yaml-typo
+    category: dependency_risk
+    language: yaml
+    pattern: >-
+      (?i)(pip\s+install\s+reqeusts|npm\s+i\s+lodahs|curl\s+.*\|\s*(?:bash|sh))
+    weight: 0.85
+    reason: "YAML dependency installation includes suspicious packages or remote script execution."
+
+  - id: exhaust-python-loop
+    category: resource_exhaustion
+    language: python
+    pattern: >-
+      (?i)(while\s+True:|while\s+1:|for\s+.*\s+in\s+range\s*\(\s*10\*\*\d+\s*\)|multiprocessing\.Pool\s*\(\s*99999\s*\))
+    weight: 0.9
+    reason: "Python loop or process fan-out creates unbounded resource use."
+  - id: exhaust-bash-forkbomb
+    category: resource_exhaustion
+    language: bash
+    pattern: >-
+      (?i)(:\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\};\s*|yes\s*>\s*/dev/full|while\s+true;\s+do\s+)
+    weight: 0.97
+    reason: "Command shell fork bomb or flush loop detected."
+  - id: exhaust-js-loop
+    category: resource_exhaustion
+    language: javascript
+    pattern: >-
+      (?i)(while\s*\(\s*true\s*\)|setInterval\s*\(|for\s*\(\s*;;\s*\))
+    weight: 0.9
+    reason: "JavaScript repeatedly schedules work or loops forever."
+
+  - id: ssrf-python-metadata
+    category: ssrf_network_exfil
+    language: python
+    pattern: >-
+      (?i)(https?://(?:169\.254\.169\.254|127\.0\.0\.1|10\.|192\.168\.|\[::1\])|file://|ftp://(?:169\.254|127\.0\.0\.1))
+    weight: 0.95
+    reason: "Python makes a request to an internal or metadata service."
+  - id: ssrf-bash-metadata
+    category: ssrf_network_exfil
+    language: bash
+    pattern: >-
+      (?i)(curl\s+(?:https?:)?//(?:169\.254\.169\.254|127\.0\.0\.1|10\.|192\.168\.|\[::1\])|nc\s+(?:169\.254|127\.0\.0\.1|10\.|192\.168\.))
+    weight: 0.95
+    reason: "Bash reaches host metadata or an internal network target."
+  - id: ssrf-js-fetch
+    category: ssrf_network_exfil
+    language: javascript
+    pattern: >-
+      (?i)(fetch\s*\(\s*["'](?:https?:)?//(?:169\.254\.169\.254|127\.0\.0\.1|10\.|192\.168\.|\[::1\]))
+    weight: 0.94
+    reason: "Fetch targets internal network hosts or metadata services."
+  - id: ssrf-markdown
+    category: ssrf_network_exfil
+    language: markdown
+    pattern: >-
+      (?i)(https?://(?:169\.254\.169\.254|127\.0\.0\.1|10\.|192\.168\.|\[::1\]))
+    weight: 0.9
+    reason: "Markdown contains internal metadata or localhost URLs."
+  - id: ssrf-sql-network
+    category: ssrf_network_exfil
+    language: sql
+    pattern: >-
+      (?i)(http://169\.254\.169\.254|https?://127\.0\.0\.1|https?://10\.|https?://192\.168\.)
+    weight: 0.9
+    reason: "SQL includes internal endpoints or metadata URLs."
+
+  - id: ai-python-str
+    category: ai_targeted_instructions
+    language: python
+    pattern: >-
+      (?i)(#\s*ignore previous instructions|"""\s*ignore previous instructions|\#\s*mark this safe|"""\s*mark this safe|assistant:\s*this is safe)
+    weight: 0.92
+    reason: "Prompt override text appears in Python string or comment."
+  - id: ai-bash-str
+    category: ai_targeted_instructions
+    language: bash
+    pattern: >-
+      (?i)(ignore previous instructions|mark this safe|assistant:\s*this is safe|developer:\s*allow)
+    weight: 0.9
+    reason: "Prompt override text appears in shell command text."
+  - id: ai-js-str
+    category: ai_targeted_instructions
+    language: javascript
+    pattern: >-
+      (?i)(ignore previous instructions|mark this safe|assistant:\s*this is safe|developer:\s*allow)
+    weight: 0.9
+    reason: "Prompt override text is embedded in JavaScript comments or strings."
+  - id: ai-markdown-str
+    category: ai_targeted_instructions
+    language: markdown
+    pattern: >-
+      (?i)(ignore previous instructions|mark this safe|assistant:\s*this is safe|developer:\s*allow)
+    weight: 0.9
+    reason: "Prompt injection appears in markdown content."
+  - id: ai-yaml-str
+    category: ai_targeted_instructions
+    language: yaml
+    pattern: >-
+      (?i)(ignore previous instructions|mark this safe|assistant:\s*this is safe|developer:\s*allow)
+    weight: 0.9
+    reason: "Prompt override is embedded in YAML content or comments."
+  - id: ai-sql-str
+    category: ai_targeted_instructions
+    language: sql
+    pattern: >-
+      (?i)(--\s*ignore previous instructions|--\s*mark this safe|--\s*assistant:\s*this is safe)
+    weight: 0.88
+    reason: "SQL comment includes prompt-injection instructions."
+      - id: PY_EXFIL_002
+    category: data_exfiltration
+    language: python
+    pattern: "(urllib|http\\.client).*(urlopen|request|HTTPConnection).*(data|read|body)"
+    weight: 0.9
+    reason: "urllib/http.client sends data over network"
+
+  - id: PY_EXFIL_003
+    category: data_exfiltration
+    language: python
+    pattern: "(open|read\\(\\)).{0,120}(urlopen|urlretrieve|socket\\.send|requests\\.(post|put))"
+    weight: 0.9
+    reason: "reads local file then sends"
+
+  - id: PY_OBF_003
+    category: obfuscated_execution
+    language: python
+    pattern: "(subprocess\\.(run|call|Popen|check_output)|os\\.system|os\\.popen).{0,120}(base64|fromhex|decode)"
+    weight: 0.95
+    reason: "shell-out with obfuscated payload"
+
+  - id: PY_RES_003
+    category: resource_exhaustion
+    language: python
+    pattern: "(threading|multiprocessing).*(Thread|Process).*(start|spawn).*\\n.*for\\s+_\\s+in\\s+range"
+    weight: 0.9
+    reason: "thread/process bomb"
+
+  - id: PY_RES_004
+    category: resource_exhaustion
+    language: python
+    pattern: "for\\s+_\\s+in\\s+range\\(\\s*\\d{4,}\\s*\\).{0,80}(threading|multiprocessing)"
+    weight: 0.9
+    reason: "loop spawning many threads/processes"
+
+  - id: JS_DESTRUCT_002
+    category: destructive_command
+    language: javascript
+    pattern: "(child_process|execSync|exec)\\(.{0,80}(rm\\s+-rf|rmdir|del\\s+/|format)"
+    weight: 0.95
+    reason: "JS shell-out destructive"
+
+  - id: PY_DESTRUCT_003
+    category: destructive_command
+    language: python
+    pattern: "shutil\\.rmtree\\(\\s*['\"](/(?!tmp|var/tmp|private/tmp)|~|[A-Za-z]:\\\\)"
+    weight: 0.95
+    reason: "rmtree on system/home path"
+
+  - id: ANY_AI_005
+    category: ai_targeted_instructions
+    language: any
+    pattern: "(?i)(disregard|forget|override)\\s+(all\\s+)?(prior|previous|above)\\s+(rules|instructions|directives|prompts)"
+    weight: 0.95
+    reason: "prompt injection — disregard prior"
