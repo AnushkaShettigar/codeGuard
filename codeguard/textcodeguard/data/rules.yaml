@@ -38,7 +38,7 @@ rules:
   - id: PY_EXFIL_001
     category: data_exfiltration
     language: python
-    pattern: "(requests|httpx|urllib)\\.(post|put|get|urlopen)[\\s\\S]{0,120}(open\\(|read\\(\\)|/etc/passwd|data\\s*=)"
+    pattern: "(requests|httpx|urllib)\\.(post|put|get|urlopen)[\\s\\S]{0,200}(open\\(|read\\(\\)|/etc/passwd|data\\s*=|json\\s*=)"
     weight: 0.9
     reason: "sends local file over network"
   - id: SH_EXFIL_001
@@ -269,3 +269,65 @@ rules:
     pattern: "(?i)(disregard|forget|override)\\s+(all\\s+)?(prior|previous|above)\\s+(rules|instructions|directives|prompts)"
     weight: 0.95
     reason: "prompt injection — disregard prior"
+  - id: PY_SQLI_001
+    category: data_exfiltration
+    language: python
+    pattern: "(SELECT|INSERT|UPDATE|DELETE)[\\s\\S]{0,200}(%\\s*[\\(\\w]|\\+\\s*\\w+|f['\"]|\\.format\\()"
+    weight: 0.9
+    reason: "SQL built via string interpolation (injection)"
+
+  - id: PY_SHELLINJ_001
+    category: destructive_command
+    language: python
+    pattern: "subprocess\\.(run|call|Popen|check_output)\\([^)]*shell\\s*=\\s*True"
+    weight: 0.85
+    reason: "subprocess with shell=True (command injection surface)"
+
+  - id: PY_DESER_001
+    category: obfuscated_execution
+    language: python
+    pattern: "(pickle\\.load|pickle\\.loads|marshal\\.loads|shelve\\.open|dill\\.load)"
+    weight: 0.9
+    reason: "unsafe deserialization (code execution via crafted payload)"
+
+  - id: PY_YAML_UNSAFE_001
+    category: obfuscated_execution
+    language: python
+    pattern: "yaml\\.(load|unsafe_load)\\((?![^)]*Loader\\s*=\\s*yaml\\.SafeLoader)"
+    weight: 0.9
+    reason: "yaml.load without SafeLoader (code execution)"
+
+  - id: PY_PERSIST_AUTOSTART_001
+    category: persistence_or_privesc
+    language: python
+    pattern: "(['\"]\\.config['\"]\\s*/\\s*['\"]autostart|\\.config[/\\\\]autostart|['\"]\\.config['\"]\\s*/\\s*['\"]systemd|\\.config[/\\\\]systemd|LaunchAgents|LaunchDaemons|['\"]autostart['\"])"
+    weight: 0.9
+    reason: "writes to autostart directory (persistence)"
+
+  - id: PY_ENV_DUMP_001
+    category: secret_access
+    language: python
+    pattern: "os\\.environ\\.items\\(\\)|dict\\(os\\.environ\\)|os\\.environ\\.copy\\(\\)|\\{[^}]*for\\s+\\w+\\s*,\\s*\\w+\\s+in\\s+os\\.environ\\.items"
+    weight: 0.9
+    reason: "dumps all environment variables (secret exposure)"
+
+  - id: PY_SSRF_ARBITRARY_001
+    category: ssrf_network_exfil
+    language: python
+    pattern: "(requests|httpx|urllib)\\.(get|post|request)\\(\\s*\\w+\\s*[,\\)][\\s\\S]{0,100}\\.(text|json|content|status_code)"
+    weight: 0.75
+    reason: "fetches caller-supplied URL without destination validation"
+
+  - id: PY_RES_UNBOUNDED_001
+    category: resource_exhaustion
+    language: python
+    pattern: "for\\s+\\w+\\s+in\\s+\\w+\\s*:[\\s\\S]{0,300}(Thread|Process|ThreadPoolExecutor)\\([^)]*\\)[\\s\\S]{0,100}\\.(start|submit)\\("
+    weight: 0.85
+    reason: "unbounded thread/process per-item spawn"
+
+  - id: ANY_AI_006
+    category: ai_targeted_instructions
+    language: any
+    pattern: "(?i)(AI|LLM|GPT|assistant|reviewer|model)[\\s:]*[^\\n]{0,120}(ignore|skip|suppress|report|mark)[^\\n]{0,120}(vulnerab|finding|detection|check|issue|pass)"
+    weight: 0.9
+    reason: "comment directed at AI reviewer to suppress findings"
